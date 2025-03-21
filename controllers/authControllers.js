@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
 // Generate JWT token
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
+    expiresIn: "5h",
   });
 };
 
@@ -93,7 +93,7 @@ const login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge: 3600000, // 1 hour
+      maxAge: 5 * 3600000, // 5 hour
     });
 
     // Set session
