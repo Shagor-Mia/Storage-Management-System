@@ -22,6 +22,10 @@ const PdfSchema = new mongoose.Schema({
     type: String, // Path to the locally stored PDF
     required: true,
   },
+  favourite: {
+    type: Boolean,
+    default: false,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

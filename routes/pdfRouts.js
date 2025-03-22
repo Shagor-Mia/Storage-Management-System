@@ -1,7 +1,7 @@
 const express = require("express");
 const authProtect = require("../middlewares/auth");
 const {
-  getPdfByDate,
+  getAllPdfByDate,
   getSizeOfPdf,
   toggleFavouritePdf,
   getAllFavouritePdf,
@@ -11,7 +11,6 @@ const {
   duplicatePdf,
   copyPdf,
   deletePdf,
-  // updatePdf,
   getPdfFile,
   getPdf,
   uploadPdf,
@@ -21,7 +20,6 @@ const pdfRouter = express.Router();
 pdfRouter.post("/upload", authProtect, uploadPdf);
 pdfRouter.get("get/:id", authProtect, getPdf);
 pdfRouter.get("/file/:id", authProtect, getPdfFile);
-// pdfRouter.put("/update/:id", authProtect, updatePdf);
 pdfRouter.delete("/delete/:id", authProtect, deletePdf);
 pdfRouter.post("/copy/:id", authProtect, copyPdf);
 pdfRouter.post("/duplicate/:id", authProtect, duplicatePdf);
@@ -31,6 +29,6 @@ pdfRouter.get("/total/count", authProtect, getTotalNumberPdfs);
 pdfRouter.get("/all/favorites", authProtect, getAllFavouritePdf);
 pdfRouter.put("/favorite/:id", authProtect, toggleFavouritePdf);
 pdfRouter.get("/size/:id", authProtect, getSizeOfPdf);
-pdfRouter.get("/date", authProtect, getPdfByDate);
+pdfRouter.get("/date/:date", authProtect, getAllPdfByDate);
 
 module.exports = pdfRouter;

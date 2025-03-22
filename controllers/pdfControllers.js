@@ -78,23 +78,6 @@ const getPdfFile = async (req, res) => {
   }
 };
 
-const updatePdf = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const updatedPdf = await Pdf.findByIdAndUpdate(
-      id,
-      { ...req.body, updatedAt: Date.now() },
-      { new: true }
-    );
-    if (!updatedPdf) {
-      return res.status(404).json({ error: "Pdf not found." });
-    }
-    res.json(updatedPdf);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
 const deletePdf = async (req, res) => {
   try {
     const { id } = req.params;
@@ -155,7 +138,7 @@ const duplicatePdf = async (req, res) => {
 
     // Generate a new filename for the duplicate
     const fileExt = path.extname(pdf.filePath);
-    const newFileName = `${Date.now()}-copy${fileExt}`;
+    const newFileName = `${Date.now()}-duplicate${fileExt}`;
     const newFilePath = path.join(__dirname, "../uploads/pdfs", newFileName);
 
     // Copy the file
@@ -164,7 +147,7 @@ const duplicatePdf = async (req, res) => {
     // Save duplicated Pdf in DB
     const duplicatedPdf = new Pdf({
       userId: req.user.id,
-      name: `${pdf.name} - Copy`,
+      name: `${pdf.name} - duplicate`,
       size: pdf.size,
       contentType: pdf.contentType,
       filePath: `/uploads/pdfs/${newFileName}`, // Store new file path
@@ -206,7 +189,14 @@ const getAllPdfs = async (req, res) => {
 // Get all favorite PDFs
 const getAllFavouritePdf = async (req, res) => {
   try {
-    const pdfs = await Pdf.find({ userId: req.user.id, favourite: true });
+    const pdfs = await Pdf.find({ userId: req.user.id, favourite: true }).sort({
+      createdAt: -1,
+    }); // Sorting PDFs by createdAt (descending order)
+
+    if (!pdfs.length) {
+      return res.status(404).json({ error: "No favourite PDFs found." });
+    }
+
     res.json(pdfs);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -223,7 +213,9 @@ const toggleFavouritePdf = async (req, res) => {
       return res.status(404).json({ error: "Pdf not found." });
     }
 
-    pdf.favourite = !pdf.favourite; // Toggle the favourite field
+    // Toggle the favourite status and update the `updatedAt` field
+    pdf.favourite = !pdf.favourite;
+    pdf.updatedAt = Date.now(); // Update the `updatedAt` timestamp
     await pdf.save();
 
     res.json(pdf);
@@ -249,12 +241,22 @@ const getSizeOfPdf = async (req, res) => {
 };
 
 // Get PDFs by creation date (sorted)
-const getPdfByDate = async (req, res) => {
+const getAllPdfByDate = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query; // Assume startDate and endDate are passed as query parameters
+    const { date } = req.params; // Date will come from the route parameter
+    const startDate = new Date(date);
+    const endDate = new Date(date);
+
+    // Set the time for startDate to midnight (00:00:00)
+    startDate.setHours(0, 0, 0, 0);
+
+    // Set the time for endDate to 11:59:59
+    endDate.setHours(23, 59, 59, 999);
+
+    // Find PDFs created on the specific date
     const pdfs = await Pdf.find({
       userId: req.user.id,
-      createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) },
+      createdAt: { $gte: startDate, $lte: endDate },
     }).sort({ createdAt: -1 }); // Sort by createdAt in descending order
 
     res.json(pdfs);
@@ -276,7 +278,6 @@ module.exports = {
   uploadPdf,
   getPdf,
   getPdfFile,
-  updatePdf,
   deletePdf,
   copyPdf,
   duplicatePdf,
@@ -285,6 +286,6 @@ module.exports = {
   getAllFavouritePdf,
   toggleFavouritePdf,
   getSizeOfPdf,
-  getPdfByDate,
+  getAllPdfByDate,
   getTotalNumberPdfs,
 };
