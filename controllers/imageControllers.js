@@ -220,6 +220,30 @@ const getAllImages = async (req, res) => {
   }
 };
 
+const getAllImageByDate = async (req, res) => {
+  try {
+    const { date } = req.params; // Date will come from the route parameter
+    const startDate = new Date(date);
+    const endDate = new Date(date);
+
+    // Set the time for startDate to midnight (00:00:00)
+    startDate.setHours(0, 0, 0, 0);
+
+    // Set the time for endDate to 11:59:59
+    endDate.setHours(23, 59, 59, 999);
+
+    // Find images created on the specific date
+    const images = await Image.find({
+      userId: req.user.id,
+      createdAt: { $gte: startDate, $lte: endDate },
+    }).sort({ createdAt: -1 }); // Sort by createdAt in descending order
+
+    res.json(images);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 const getAllFavoriteImages = async (req, res) => {
   try {
     const images = await Image.find({ favorite: true, userId: req.user.id });
@@ -249,6 +273,7 @@ module.exports = {
   duplicateImage,
   renameImage,
   getAllImages,
+  getAllImageByDate,
   getAllFavoriteImages,
   getTotalNumberImages,
 };

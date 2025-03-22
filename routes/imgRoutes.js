@@ -14,6 +14,7 @@ const {
   getAllFavoriteImages,
   getTotalNumberImages,
   duplicateImage,
+  getAllImageByDate,
 } = require("../controllers/imageControllers");
 const authProtect = require("../middlewares/auth");
 
@@ -28,6 +29,8 @@ router.post("/duplicate/:id", authProtect, duplicateImage);
 
 router.patch("/rename/:id", authProtect, renameImage);
 router.get("/get-all", authProtect, getAllImages);
+router.get("/date/:date", authProtect, getAllImageByDate);
+
 router.get("/all/favorites", authProtect, getAllFavoriteImages);
 router.get("/total/count", authProtect, getTotalNumberImages);
 
