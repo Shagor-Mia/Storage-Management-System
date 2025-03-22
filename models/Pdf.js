@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const ImageSchema = new mongoose.Schema({
+const PdfSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
@@ -15,17 +15,12 @@ const ImageSchema = new mongoose.Schema({
     required: true,
   },
   contentType: {
-    type: String, // e.g., 'image/jpeg', 'image/png'
+    type: String, // e.g., 'application/pdf'
     required: true,
   },
   filePath: {
-    // Add filePath for local storage
-    type: String,
+    type: String, // Path to the locally stored PDF
     required: true,
-  },
-  favorite: {
-    type: Boolean,
-    default: false,
   },
   createdAt: {
     type: Date,
@@ -37,4 +32,4 @@ const ImageSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model("Image", ImageSchema);
+module.exports = mongoose.model("Pdf", PdfSchema);
