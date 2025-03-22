@@ -9,6 +9,7 @@ const authRoutes = require("./routes/authRoutes");
 const folderRoute = require("./routes/folderRoutes");
 const imageRoutes = require("./routes/imgRoutes");
 const pdfRouter = require("./routes/pdfRouts");
+const noteRouter = require("./routes/noteRoutes");
 // const pdfRoutes = require("./routes/pdfRoutes");
 
 const app = express();
@@ -30,5 +31,6 @@ app.use("/api/auth", authRoutes);
 app.use("/api/folder", folderRoute);
 app.use("/api/image", imageRoutes);
 app.use("/api/pdf", pdfRouter);
+app.use("/api/note", noteRouter);
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
