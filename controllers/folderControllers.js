@@ -68,16 +68,6 @@ const deleteFolder = async (req, res) => {
   }
 };
 
-const getSubfolders = async (req, res) => {
-  try {
-    const { parentId } = req.params;
-    const subfolders = await Folder.find({ parentId, userId: req.user.id }); // Verify userId
-    res.json(subfolders);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
 const toggleFavorite = async (req, res) => {
   try {
     const { id } = req.params;
@@ -232,7 +222,6 @@ module.exports = {
   getFolder,
   updateFolder,
   deleteFolder,
-  getSubfolders,
   toggleFavorite,
   copyFolder,
   renameFolder,
