@@ -10,7 +10,6 @@ const folderRoute = require("./routes/folderRoutes");
 const imageRoutes = require("./routes/imgRoutes");
 const pdfRouter = require("./routes/pdfRouts");
 const noteRouter = require("./routes/noteRoutes");
-// const pdfRoutes = require("./routes/pdfRoutes");
 
 const app = express();
 

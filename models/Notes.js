@@ -6,6 +6,11 @@ const NoteSchema = new mongoose.Schema({
     ref: "User",
     required: true, // Each note belongs to a user
   },
+  parentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Folder",
+    default: null,
+  },
   title: {
     type: String,
     required: true,

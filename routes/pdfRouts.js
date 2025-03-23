@@ -14,6 +14,7 @@ const {
   getPdfFile,
   getPdf,
   uploadPdf,
+  getTotalSizeOfAllPdfs,
 } = require("../controllers/pdfControllers");
 const pdfRouter = express.Router();
 
@@ -26,6 +27,8 @@ pdfRouter.post("/duplicate/:id", authProtect, duplicatePdf);
 pdfRouter.put("/rename/:id", authProtect, renamePdf);
 pdfRouter.get("/get-all", authProtect, getAllPdfs);
 pdfRouter.get("/total/count", authProtect, getTotalNumberPdfs);
+pdfRouter.get("/total/size", authProtect, getTotalSizeOfAllPdfs);
+
 pdfRouter.get("/all/favorites", authProtect, getAllFavouritePdf);
 pdfRouter.put("/favorite/:id", authProtect, toggleFavouritePdf);
 pdfRouter.get("/size/:id", authProtect, getSizeOfPdf);

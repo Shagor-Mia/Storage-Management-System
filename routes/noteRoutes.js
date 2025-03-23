@@ -15,6 +15,7 @@ const {
   renameNote,
   copyNote,
   duplicateNote,
+  getTotalSizeOfAllNotes,
 } = require("../controllers/notesControllers");
 
 const noteRouter = express.Router();
@@ -30,6 +31,8 @@ noteRouter.post("/copy/:id", authProtect, copyNote);
 noteRouter.post("/duplicate/:id", authProtect, duplicateNote);
 noteRouter.get("/get-all", authProtect, getAllNotes);
 noteRouter.get("/total/count", authProtect, getTotalNumberNotes);
+noteRouter.get("/total/size", authProtect, getTotalSizeOfAllNotes);
+
 noteRouter.get("/all/favorites", authProtect, getAllFavouriteNotes);
 noteRouter.put("/favorite/:id", authProtect, toggleFavouriteNote);
 noteRouter.get("/date/:date", authProtect, getAllNotesByDate);

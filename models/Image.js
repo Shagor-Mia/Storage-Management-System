@@ -6,6 +6,11 @@ const ImageSchema = new mongoose.Schema({
     ref: "User",
     required: true,
   },
+  parentId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Folder",
+    default: null,
+  },
   name: {
     type: String,
     required: true,

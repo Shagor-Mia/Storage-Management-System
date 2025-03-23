@@ -1,44 +1,44 @@
 const multer = require("multer");
-const fs = require("fs");
-const path = require("path");
+const cloudinary = require("cloudinary").v2;
 const Image = require("../models/Image");
 
-// Configure Multer for local file storage
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = "uploads/";
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const upload = multer({ storage }).single("image"); // Ensure "image" matches Postman key
+// Configure Multer for in-memory storage
+const storage = multer.memoryStorage();
+const upload = multer({ storage }).single("image");
 
 const uploadImage = async (req, res) => {
   upload(req, res, async (err) => {
     if (err) return res.status(500).json({ error: err.message });
 
-    console.log("Req File:", req.file); // Debugging
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
 
     try {
-      const image = new Image({
-        userId: req.user.id,
-        name: req.file.originalname,
-        size: req.file.size,
-        contentType: req.file.mimetype,
-        filePath: `/uploads/${req.file.filename}`, // Store the file path
-      });
+      const result = await cloudinary.uploader
+        .upload_stream({ resource_type: "image" }, async (error, result) => {
+          if (error) return res.status(500).json({ error: error.message });
 
-      await image.save();
-      res.status(201).json(image);
+          const image = new Image({
+            userId: req.user.id,
+            name: req.file.originalname,
+            size: req.file.size,
+            contentType: req.file.mimetype,
+            filePath: result.secure_url,
+            cloudinaryPublicId: result.public_id,
+          });
+
+          await image.save();
+          res.status(201).json(image);
+        })
+        .end(req.file.buffer);
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
@@ -58,6 +58,21 @@ const getImage = async (req, res) => {
   }
 };
 
+const getSizeOfImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const image = await Image.findById(id);
+
+    if (!image) {
+      return res.status(404).json({ error: "Image not found." });
+    }
+
+    res.json({ size: image.size });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 const getImageFile = async (req, res) => {
   try {
     const { id } = req.params;
@@ -67,13 +82,8 @@ const getImageFile = async (req, res) => {
       return res.status(404).json({ error: "Image file not found" });
     }
 
-    const filePath = path.join(__dirname, "../", image.filePath);
-
-    if (fs.existsSync(filePath)) {
-      res.sendFile(filePath);
-    } else {
-      res.status(404).json({ error: "Image not found on file system" });
-    }
+    // Redirect to Cloudinary URL
+    res.redirect(image.filePath);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -105,10 +115,9 @@ const deleteImage = async (req, res) => {
       return res.status(404).json({ error: "Image not found" });
     }
 
-    const filePath = path.join(__dirname, "../", image.filePath);
-
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath); // Delete the file from the file system
+    // Delete from Cloudinary
+    if (image.cloudinaryPublicId) {
+      await cloudinary.uploader.destroy(image.cloudinaryPublicId);
     }
 
     await Image.findByIdAndDelete(id);
@@ -146,6 +155,7 @@ const copyImage = async (req, res) => {
       size: image.size,
       contentType: image.contentType,
       filePath: image.filePath,
+      cloudinaryPublicId: image.cloudinaryPublicId,
     });
     await newImage.save();
     res.json(newImage);
@@ -163,27 +173,17 @@ const duplicateImage = async (req, res) => {
       return res.status(404).json({ error: "Image not found." });
     }
 
-    const originalFilePath = path.join(__dirname, "../", image.filePath);
+    const newResult = await cloudinary.uploader.upload(image.filePath, {
+      public_id: `${image.cloudinaryPublicId}-copy`,
+    });
 
-    if (!fs.existsSync(originalFilePath)) {
-      return res.status(404).json({ error: "Image file not found on server." });
-    }
-
-    // Generate a new filename for the duplicate
-    const fileExt = path.extname(image.filePath);
-    const newFileName = `${Date.now()}-copy${fileExt}`;
-    const newFilePath = path.join(__dirname, "../uploads", newFileName);
-
-    // Copy the file
-    fs.copyFileSync(originalFilePath, newFilePath);
-
-    // Save duplicated image in DB
     const duplicatedImage = new Image({
       userId: req.user.id,
       name: `${image.name} - Copy`,
       size: image.size,
       contentType: image.contentType,
-      filePath: `/uploads/${newFileName}`, // Store new file path
+      filePath: newResult.secure_url,
+      cloudinaryPublicId: newResult.public_id,
     });
 
     await duplicatedImage.save();
@@ -222,21 +222,17 @@ const getAllImages = async (req, res) => {
 
 const getAllImageByDate = async (req, res) => {
   try {
-    const { date } = req.params; // Date will come from the route parameter
+    const { date } = req.params;
     const startDate = new Date(date);
     const endDate = new Date(date);
 
-    // Set the time for startDate to midnight (00:00:00)
     startDate.setHours(0, 0, 0, 0);
-
-    // Set the time for endDate to 11:59:59
     endDate.setHours(23, 59, 59, 999);
 
-    // Find images created on the specific date
     const images = await Image.find({
       userId: req.user.id,
       createdAt: { $gte: startDate, $lte: endDate },
-    }).sort({ createdAt: -1 }); // Sort by createdAt in descending order
+    }).sort({ createdAt: -1 });
 
     res.json(images);
   } catch (err) {
@@ -262,9 +258,27 @@ const getTotalNumberImages = async (req, res) => {
   }
 };
 
+const getTotalSizeOfAllImages = async (req, res) => {
+  try {
+    // Find all images
+    const images = await Image.find({ contentType: /^image\// });
+
+    // Sum up the sizes
+    const totalSize = images.reduce((acc, img) => acc + img.size, 0);
+
+    res.status(200).json({ totalSize });
+  } catch (error) {
+    console.error("Error fetching total image size:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+module.exports = { getTotalSizeOfAllImages };
+
 module.exports = {
   uploadImage,
   getImage,
+  getSizeOfImage,
   getImageFile,
   updateImage,
   deleteImage,
@@ -276,4 +290,5 @@ module.exports = {
   getAllImageByDate,
   getAllFavoriteImages,
   getTotalNumberImages,
+  getTotalSizeOfAllImages,
 };

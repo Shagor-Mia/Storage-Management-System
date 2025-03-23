@@ -1,21 +1,16 @@
 const multer = require("multer");
-const fs = require("fs");
-const path = require("path");
+const cloudinary = require("cloudinary").v2;
 const Note = require("../models/Notes");
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadPath = "uploads/notes/";
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-    }
-    cb(null, uploadPath);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  },
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Configure Multer for in-memory storage
+const storage = multer.memoryStorage();
 const upload = multer({ storage }).single("file");
 
 // Create Note
@@ -32,11 +27,22 @@ const createNote = async (req, res) => {
       };
 
       if (req.file) {
+        // Convert buffer to a base64-encoded string with proper formatting
+        const base64File = `data:${
+          req.file.mimetype
+        };base64,${req.file.buffer.toString("base64")}`;
+
+        const result = await cloudinary.uploader.upload(base64File, {
+          resource_type: "auto", // Automatically detect file type
+          folder: "notes", // Store in a 'notes' folder
+        });
+
         noteData.file = {
           name: req.file.originalname,
           size: req.file.size,
           contentType: req.file.mimetype,
-          filePath: `/uploads/notes/${req.file.filename}`, // Store relative path
+          filePath: result.secure_url, // Store Cloudinary URL
+          cloudinaryPublicId: result.public_id, // Store Cloudinary public ID
         };
       }
 
@@ -71,13 +77,8 @@ const getNoteFile = async (req, res) => {
       return res.status(404).json({ error: "Note file not found" });
     }
 
-    const filePath = path.join(__dirname, "../", note.file.filePath);
-
-    if (fs.existsSync(filePath)) {
-      res.sendFile(filePath);
-    } else {
-      res.status(404).json({ error: "Note file not found on file system" });
-    }
+    // Redirect to Cloudinary URL
+    res.redirect(note.file.filePath);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -109,11 +110,8 @@ const deleteNote = async (req, res) => {
       return res.status(404).json({ error: "Note not found" });
     }
 
-    if (note.file && note.file.filePath) {
-      const filePath = path.join(__dirname, "../", note.file.filePath);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath); // Delete the file from the file system
-      }
+    if (note.file && note.file.cloudinaryPublicId) {
+      await cloudinary.uploader.destroy(note.file.cloudinaryPublicId);
     }
 
     await Note.findByIdAndDelete(id);
@@ -190,24 +188,18 @@ const duplicateNote = async (req, res) => {
       return res.status(404).json({ error: "Note not found." });
     }
 
-    if (note.file && note.file.filePath) {
-      const originalFilePath = path.join(__dirname, "../", note.file.filePath);
+    if (note.file && note.file.cloudinaryPublicId && note.file.filePath) {
+      // Check if file.filePath exists
+      const newResult = await cloudinary.uploader.explicit(
+        note.file.cloudinaryPublicId,
+        {
+          type: "upload",
+          public_id: `${note.file.cloudinaryPublicId}-copy`,
+          folder: "notes",
+          overwrite: true,
+        }
+      );
 
-      if (!fs.existsSync(originalFilePath)) {
-        return res
-          .status(404)
-          .json({ error: "Note file not found on server." });
-      }
-
-      // Generate a new filename for the duplicate
-      const fileExt = path.extname(note.file.filePath);
-      const newFileName = `${Date.now()}-duplicate${fileExt}`;
-      const newFilePath = path.join(__dirname, "../uploads/notes", newFileName);
-
-      // Copy the file
-      fs.copyFileSync(originalFilePath, newFilePath);
-
-      // Save duplicated Note in DB
       const duplicatedNote = new Note({
         userId: req.user.id,
         title: `${note.title} - Copy`,
@@ -216,7 +208,8 @@ const duplicateNote = async (req, res) => {
           name: note.file.name,
           size: note.file.size,
           contentType: note.file.contentType,
-          filePath: `/uploads/notes/${newFileName}`, // Store new file path
+          filePath: newResult.secure_url,
+          cloudinaryPublicId: newResult.public_id,
         },
         favourite: note.favourite,
       });
@@ -224,11 +217,19 @@ const duplicateNote = async (req, res) => {
       await duplicatedNote.save();
       res.status(201).json(duplicatedNote);
     } else {
+      // Ensure file.filePath is provided, even if it's an empty string or null
       const duplicatedNote = new Note({
         userId: req.user.id,
         title: `${note.title} - Copy`,
         description: note.description,
         favourite: note.favourite,
+        file: {
+          name: "No File",
+          size: 0,
+          contentType: "text/plain",
+          filePath: "", // Provide an empty string
+          cloudinaryPublicId: "",
+        },
       });
       await duplicatedNote.save();
       res.status(201).json(duplicatedNote);
@@ -307,6 +308,22 @@ const getTotalNumberNotes = async (req, res) => {
   }
 };
 
+const getTotalSizeOfAllNotes = async (req, res) => {
+  try {
+    // Fetch all notes belonging to the user
+    const notes = await Note.find({ userId: req.user.id });
+
+    // Calculate total size of all files
+    const totalSize = notes.reduce((sum, note) => {
+      return sum + (note.file?.size || 0); // Ensure to handle cases where file might not exist
+    }, 0);
+
+    res.json({ totalSize }); // Return total size in bytes
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports = {
   createNote,
   getNote,
@@ -322,4 +339,5 @@ module.exports = {
   toggleFavouriteNote,
   getAllNotesByDate,
   getTotalNumberNotes,
+  getTotalSizeOfAllNotes,
 };

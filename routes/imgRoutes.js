@@ -15,11 +15,15 @@ const {
   getTotalNumberImages,
   duplicateImage,
   getAllImageByDate,
+  getSizeOfImage,
+  getTotalSizeOfAllImages,
 } = require("../controllers/imageControllers");
 const authProtect = require("../middlewares/auth");
 
 router.post("/upload", authProtect, uploadImage);
 router.get("/get/:id", authProtect, getImage);
+router.get("/size/:id", authProtect, getSizeOfImage);
+
 router.get("/file/:id", authProtect, getImageFile);
 router.put("/update/:id", authProtect, updateImage);
 router.delete("/delete/:id", authProtect, deleteImage);
@@ -33,5 +37,6 @@ router.get("/date/:date", authProtect, getAllImageByDate);
 
 router.get("/all/favorites", authProtect, getAllFavoriteImages);
 router.get("/total/count", authProtect, getTotalNumberImages);
+router.get("/total/Size", authProtect, getTotalSizeOfAllImages);
 
 module.exports = router;
